@@ -6,6 +6,7 @@
 #include "moves_list.h"
 #include "movegen.h"
 #include "evaluation.h"
+#include "see.h"
 #include "transposition_table.h"
 #include "gettime.h"
 
@@ -190,6 +191,7 @@ static inline int quiescence(int alpha, int beta, s_board *pos, s_info *info) {
     sort_moves(move_list, 0, pos);
 
     for (int count = 0; count < move_list->count; count++) {
+        if (see(pos, move_list->moves[count]) < 0) continue;
         struct copy_pos qcopy;
         copy_board(pos, &qcopy);
         pos->ply++;
@@ -263,6 +265,12 @@ static inline int negamax(int alpha, int beta, int depth, s_board *pos, s_info *
 
     int legal_moves=0;
 
+    // Reverse Futility Pruning
+    int eval = evaluate(pos);
+    if (depth <= 6 && eval - 80 * depth >= beta) {
+      return (eval + beta) / 2;
+    }
+
     // Null Move Pruning
     if (depth >= 3 && !in_check && pos->ply) {
         struct copy_pos nmp;
@@ -294,7 +302,7 @@ static inline int negamax(int alpha, int beta, int depth, s_board *pos, s_info *
 
     // Razoring
     if (!pv_node && !in_check && depth <= 3) {
-        score = evaluate(pos) + 125;
+        score = eval + 125;
         int new_score;
 
         if (score < beta) {
@@ -326,6 +334,7 @@ static inline int negamax(int alpha, int beta, int depth, s_board *pos, s_info *
     int moves_searched = 0;
 
     for (int count = 0; count < move_list->count; count++) {
+        if (see(pos, move_list->moves[count]) < -17 * depth * depth) continue;
         struct copy_pos ncopy;
         copy_board(pos, &ncopy);
         pos->ply++;
